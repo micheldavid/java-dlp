@@ -13,7 +13,16 @@ import com.google.privacy.dlp.v2.InspectConfig;
 import com.google.privacy.dlp.v2.LocationName;
 import com.google.privacy.dlp.v2.PrimitiveTransformation;
 import com.google.privacy.dlp.v2.RedactConfig;
+import com.google.privacy.dlp.v2.ReplaceValueConfig;
+import com.google.privacy.dlp.v2.ReplaceWithInfoTypeConfig;
+import com.google.privacy.dlp.v2.Value;
 import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.http.HttpHeaders;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
 
 /**
  * Run with:
@@ -74,5 +83,92 @@ public class RegionalDeIdentifyContent {
     System.out.println(response);
 
     System.out.println("Text after redaction: " + response.getItem().getValue());
+
+    /*
+
+While executing next line, I get an error:
+
+Error while extracting response for type [class
+com.google.privacy.dlp.v2.DeidentifyContentResponse] and content type
+[application/json;charset=UTF-8]
+
+
+Cannot find field: sensitivityScore in message
+google.privacy.dlp.v2.InfoType
+
+*/
+    request = buildDeIdentifyContentRequest(textToRedact, Arrays.asList("FIRST_NAME", "US_STATE"));
+    System.out.println("Request:");
+    System.out.println(request);
+    response = dlp.deidentifyContent(request);
+    System.out.println("Response:");
+    System.out.println(response);
+    System.out.println("Text after redaction: " + response.getItem().getValue());
+  }
+
+  public static DeidentifyContentRequest buildDeIdentifyContentRequest(String
+      textToRedact, List<String> infoTypesList) {
+
+    ContentItem contentItem =
+        ContentItem.newBuilder().setValue(textToRedact).build();
+
+    List<InfoType> infoTypes = new ArrayList<>();
+
+    infoTypesList.stream().filter(Objects::nonNull).forEach(it -> {
+          infoTypes.add(InfoType.newBuilder().setName(it).build()); //FIRST_NAME, US_STATE, etc.
+        }
+    );
+
+    InspectConfig inspectConfig =
+        InspectConfig.newBuilder().addAllInfoTypes(infoTypes).build();
+
+// Specify replacement string to be used for the finding.
+
+    ReplaceValueConfig replaceValueConfig =
+        ReplaceValueConfig.newBuilder()
+            .setNewValue(Value.newBuilder().setStringValue("******").build()).build();
+
+    PrimitiveTransformation primitiveTransformation =
+
+        PrimitiveTransformation.newBuilder()
+
+            .setReplaceWithInfoTypeConfig(ReplaceWithInfoTypeConfig.getDefaultInstance())
+
+            .setReplaceConfig(replaceValueConfig)
+
+            .build();
+
+    InfoTypeTransformations.InfoTypeTransformation infoTypeTransformation =
+
+        InfoTypeTransformations.InfoTypeTransformation.newBuilder()
+
+            .setPrimitiveTransformation(primitiveTransformation)
+
+            .build();
+
+    InfoTypeTransformations transformations =
+
+        InfoTypeTransformations.newBuilder().addTransformations(infoTypeTransformation).build();
+
+    DeidentifyConfig deidentifyConfig =
+
+        DeidentifyConfig.newBuilder().setInfoTypeTransformations(transformations).build();
+
+// Combine configurations into a request for the service.
+
+    DeidentifyContentRequest request =
+
+        DeidentifyContentRequest.newBuilder()
+
+            .setItem(contentItem)
+
+            .setInspectConfig(inspectConfig)
+
+            .setDeidentifyConfig(deidentifyConfig)
+
+            .build();
+
+    return request;
+
   }
 }
